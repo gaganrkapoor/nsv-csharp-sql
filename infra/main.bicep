@@ -53,20 +53,6 @@ resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   tags: tags
 }
 
-// The application frontend
-module web './app/web-appservice-avm.bicep' = {
-  name: 'web'
-  scope: rg
-  params: {
-    name: !empty(webServiceName) ? webServiceName : '${abbrs.webSitesAppService}web-${resourceToken}'
-    location: location
-    tags: tags
-    appServicePlanId: appServicePlan.outputs.resourceId
-    appInsightResourceId: monitoring.outputs.applicationInsightsResourceId
-    linuxFxVersion: 'node|20-lts'
-  }
-}
-
 // The application backend
 module api './app/api-appservice-avm.bicep' = {
   name: 'api'
@@ -87,7 +73,11 @@ module api './app/api-appservice-avm.bicep' = {
       SCM_DO_BUILD_DURING_DEPLOYMENT: false
     }
     appInsightResourceId: monitoring.outputs.applicationInsightsResourceId
-    allowedOrigins: [web.outputs.SERVICE_WEB_URI]
+    allowedOrigins: [
+      'https://${!empty(webServiceName) ? webServiceName : '${abbrs.webSitesAppService}web-${resourceToken}'}.azurewebsites.net'
+      'http://localhost:3000'
+      'http://localhost:5173'
+    ]  // Use calculated web app URL instead of hardcoded value
   }
 }
 
@@ -234,9 +224,32 @@ module apimApi 'br/public:avm/ptn/azd/apim-api:0.1.0' = if (useAPIM) {
     apiName: 'todo-api'
     apiPath: 'todo'
     name: useAPIM ? apim.outputs.name : ''
-    webFrontendUrl: web.outputs.SERVICE_WEB_URI
+    webFrontendUrl: ''  // Remove circular dependency - will be updated later
     location: location
     apiAppName: api.outputs.SERVICE_API_NAME
+  }
+}
+
+// The application frontend - moved after API modules to avoid circular dependency
+module web './app/web-appservice-avm.bicep' = {
+  name: 'web'
+  scope: rg
+  params: {
+    name: !empty(webServiceName) ? webServiceName : '${abbrs.webSitesAppService}web-${resourceToken}'
+    location: location
+    tags: tags
+    appServicePlanId: appServicePlan.outputs.resourceId
+    appInsightResourceId: monitoring.outputs.applicationInsightsResourceId
+    linuxFxVersion: 'node|20-lts'
+    // Add the app settings that the build process needs
+    appSettings: {
+      // These are used by the build hooks in azure.yaml
+      API_BASE_URL: useAPIM ? apimApi.outputs.serviceApiUri : api.outputs.SERVICE_API_URI
+      APPLICATIONINSIGHTS_CONNECTION_STRING: monitoring.outputs.applicationInsightsConnectionString
+      // These are used by the runtime application
+      VITE_API_BASE_URL: useAPIM ? apimApi.outputs.serviceApiUri : api.outputs.SERVICE_API_URI
+      VITE_APPLICATIONINSIGHTS_CONNECTION_STRING: monitoring.outputs.applicationInsightsConnectionString
+    }
   }
 }
 

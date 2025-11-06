@@ -7,6 +7,7 @@ param appInsightResourceId string
 param appServicePlanId string
 param linuxFxVersion string
 param kind string = 'app,linux'
+param appSettings object = {} // Add this parameter
 
 module web 'br/public:avm/res/web/site:0.6.0' = {
   name: '${name}-deployment'
@@ -28,7 +29,11 @@ module web 'br/public:avm/res/web/site:0.6.0' = {
       failedRequestsTracing: { enabled: true }
       httpLogs: { fileSystem: { enabled: true, retentionInDays: 1, retentionInMb: 35 } }
     }
-    appSettingsKeyValuePairs: { ApplicationInsightsAgent_EXTENSION_VERSION: contains(kind, 'linux') ? '~3' : '~2' }
+        // Merge the passed appSettings with the default ones
+    appSettingsKeyValuePairs: union(
+      { ApplicationInsightsAgent_EXTENSION_VERSION: contains(kind, 'linux') ? '~3' : '~2' },
+      appSettings
+    )
   }
 }
 
