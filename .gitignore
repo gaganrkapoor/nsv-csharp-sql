@@ -1,0 +1,4 @@
+.azure
+azurite/
+.venv/
+local.settings.json

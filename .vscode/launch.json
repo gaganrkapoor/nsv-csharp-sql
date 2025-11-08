@@ -1,0 +1,52 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug Web",
+            "request": "launch",
+            "type": "msedge",
+            "webRoot": "${workspaceFolder}/src/web/src",
+            "url": "http://localhost:3000",
+            "sourceMapPathOverrides": {
+                "webpack:///src/*": "${webRoot}/*"
+            }
+        },
+        {
+            "name": "Debug API",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "Build API",
+            "program": "${workspaceFolder}/src/api/bin/Debug/net8.0/Todo.Api.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/src/api",
+            "stopAtEntry": false,
+            "env": {
+                "ASPNETCORE_ENVIRONMENT": "Development"
+            },
+            "envFile": "${input:dotEnvFilePath}"
+        },
+        {
+            "name": ".NET Core Attach",
+            "type": "coreclr",
+            "request": "attach"
+        },
+        {
+            "name": "Attach to Python Functions",
+            "type": "debugpy",
+            "request": "attach",
+            "connect": {
+                "host": "localhost",
+                "port": 9091
+            },
+            "preLaunchTask": "func: host start"
+        }
+    ],
+
+    "inputs": [
+        {
+            "id": "dotEnvFilePath",
+            "type": "command",
+            "command": "azure-dev.commands.getDotEnvFilePath"
+        }
+    ]
+}
