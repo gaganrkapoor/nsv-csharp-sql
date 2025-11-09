@@ -2,3 +2,8 @@
 azurite/
 .venv/
 local.settings.json
+.python_packages/
+.python_packages/**
+__pycache__/
+*.py[cod]
+*$py.class
