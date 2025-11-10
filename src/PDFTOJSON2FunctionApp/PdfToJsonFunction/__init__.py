@@ -12,10 +12,7 @@ if python_packages_path not in sys.path:
 sys.path.append(function_app_root)
 
 import azure.functions as func
-from ocr_service import extract_text_and_fields
-from supplier_id_service import identify_supplier
-from katoomba_extractor import extract_katoomba_fields
-from ai_prompt_service import extract_with_ai
+from .ocr_service import extract_text_and_fields
 
 BLOB_OUTPUT_CONTAINER = os.getenv('BLOB_OUTPUT_CONTAINER')
 
@@ -27,40 +24,29 @@ def custom_json_serializer(obj):
     raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
 
 
-def main(blob: func.InputStream, outputBlob: func.Out[str]):
-    logging.info(f"Processing blob: {blob.name}, Size: {blob.length} bytes")
+def main(blob: func.InputStream, ocrJsonBlob: func.Out[str]):
+    logging.info(f"Processing PDF blob: {blob.name}, Size: {blob.length} bytes")
     pdf_bytes = blob.read()
 
-    # Step 1: OCR and initial field extraction
+    # Step 1: OCR and initial field extraction only
     ocr_json = extract_text_and_fields(pdf_bytes)
+    
+    # Save OCR JSON to intermediate container for ProcessInvoiceJSONFunction
+    try:
+        ocr_json_output = json.dumps(ocr_json, default=custom_json_serializer, indent=2)
+        ocrJsonBlob.set(ocr_json_output)
+        logging.info("OCR JSON saved to intermediate container")
+    except Exception as e:
+        logging.error(f"Error saving OCR JSON: {e}")
+        # Fallback: convert problematic objects to strings
+        fallback_ocr_data = json.loads(json.dumps(ocr_json, default=str, indent=2))
+        ocrJsonBlob.set(json.dumps(fallback_ocr_data, indent=2))
+        logging.info("OCR JSON saved with fallback serialization")
     
     # Log OCR JSON safely with custom serializer
     try:
         ocr_preview = json.dumps(ocr_json, default=custom_json_serializer)[:500]
-        logging.info(f"OCR JSON: {ocr_preview}")
+        logging.info(f"OCR JSON preview: {ocr_preview}")
     except Exception as e:
         logging.warning(f"Could not serialize OCR JSON for logging: {e}")
         logging.info("OCR extraction completed successfully")
-
-    # Step 2: Supplier identification
-    supplier = identify_supplier(ocr_json)
-    logging.info(f"Identified supplier: {supplier}")
-
-    # Step 3: Supplier-specific extraction
-    if supplier == "KATOOMBA":
-        invoice_data = extract_katoomba_fields(ocr_json)
-    else:
-        # Fallback to AI prompt engineering
-        invoice_data = extract_with_ai(ocr_json, supplier)
-
-    # Step 4: Output JSON with custom serializer
-    try:
-        output_json = json.dumps(invoice_data, default=custom_json_serializer, indent=2)
-        outputBlob.set(output_json)
-        logging.info("Extraction complete and output written.")
-    except Exception as e:
-        logging.error(f"Error serializing output JSON: {e}")
-        # Fallback: convert problematic objects to strings
-        fallback_data = json.loads(json.dumps(invoice_data, default=str, indent=2))
-        outputBlob.set(json.dumps(fallback_data, indent=2))
-        logging.info("Extraction complete with fallback serialization.")

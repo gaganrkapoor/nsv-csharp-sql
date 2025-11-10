@@ -1,6 +1,7 @@
 azure-functions
 azure-ai-formrecognizer
 azure-ai-ml
+azure-storage-blob
 openai
 python-dotenv
 requests

@@ -2,17 +2,17 @@
   "scriptFile": "__init__.py",
   "bindings": [
     {
-      "name": "blob",
+      "name": "jsonBlob",
       "type": "blobTrigger",
       "direction": "in",
-      "path": "%BLOB_INPUT_CONTAINER%/{name}",
+      "path": "%INVOICE_JSON_CONTAINER%/{name}",
       "connection": "AzureWebJobsStorage"
     },
     {
-      "name": "ocrJsonBlob",
+      "name": "outputBlob",
       "type": "blob",
       "direction": "out",
-      "path": "%INVOICE_JSON_CONTAINER%/{name}.ocr.json",
+      "path": "%BLOB_OUTPUT_CONTAINER%/{name}.processed.json",
       "connection": "AzureWebJobsStorage"
     }
   ]
