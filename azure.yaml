@@ -38,3 +38,7 @@ services:
     project: ./src/api
     language: csharp
     host: appservice
+  pdf-function:
+    project: ./src/pdf-extract-function
+    language: python
+    host: function

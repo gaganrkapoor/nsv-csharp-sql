@@ -9,20 +9,35 @@ import azure.functions as func
 app = func.FunctionApp()
 
 @app.function_name(name="PdfExtractFunction")
-@app.blob_trigger(arg_name="pdfblob", path="pdf-input/{name}", connection="AzureWebJobsStorage")
+@app.blob_trigger(arg_name="pdfblob", path="invoices/{name}", connection="AzureWebJobsStorage")
 def pdf_extract_function(pdfblob: func.InputStream):
+    """
+    PDF extraction function that processes files uploaded to the configured input container.
+    
+    Note: The blob trigger path is hardcoded to 'invoices/{name}' due to Azure Functions limitations,
+    but the actual container name used for processing is configurable via INVOICES_CONTAINER_NAME.
+    Ensure the Key Vault secret INVOICES-CONTAINER matches the trigger path.
+    """
     logging.info(f"Triggered by blob: {pdfblob.name}")
 
     # === Environment Variables ===
     endpoint = os.environ["FORM_RECOGNIZER_ENDPOINT"].rstrip('/')  # Remove trailing slash
     api_key = os.environ["FORM_RECOGNIZER_KEY"]
     model_id = os.environ["FORM_RECOGNIZER_MODEL_ID"]
-    output_container = os.environ["OUTPUT_CONTAINER"]
+    
+    # Read all container names from environment variables (sourced from Key Vault)
+    input_container = os.environ["INVOICES_CONTAINER_NAME"]  # "invoices"
+    output_container = os.environ["INVOICES_JSON_CONTAINER_NAME"]  # "invoices-json"
+    processed_container = os.environ["PROCESSED_INVOICES_CONTAINER_NAME"]  # "processed-invoices"
+    
     storage_connection = os.environ["AzureWebJobsStorage"]
 
-    # === Connect to local emulator or Azure Blob ===
+    # Log container configuration for debugging
+    logging.info(f"Container configuration - Input: {input_container}, Output: {output_container}, Processed: {processed_container}")
+
+    # === Connect to Azure Blob storage ===
     blob_service_client = BlobServiceClient.from_connection_string(storage_connection)
-    container_name = "pdf-input"
+    container_name = input_container  # Use configurable container name instead of hardcoded "invoices"
     blob_name = pdfblob.name.split("/")[-1]
     blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
 

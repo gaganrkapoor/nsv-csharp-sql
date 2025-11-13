@@ -34,6 +34,12 @@ param apimSku string = 'Consumption'
 @description('Id of the user or app to assign application roles')
 param principalId string = ''
 
+@description('Storage account name')
+param storageAccountName string = ''
+
+@description('Function app name')
+param functionAppName string = ''
+
 @secure()
 @description('SQL Server administrator password')
 param sqlAdminPassword string
@@ -70,6 +76,7 @@ module api './app/api-appservice-avm.bicep' = {
     appSettings: {
       AZURE_KEY_VAULT_ENDPOINT: keyVault.outputs.uri
       AZURE_SQL_CONNECTION_STRING_KEY: connectionStringKey
+      AZURE_STORAGE_CONNECTION_STRING: '@Microsoft.KeyVault(VaultName=${keyVault.outputs.name};SecretName=STORAGE-CONNECTION-STRING)'
       SCM_DO_BUILD_DURING_DEPLOYMENT: false
     }
     appInsightResourceId: monitoring.outputs.applicationInsightsResourceId
@@ -105,6 +112,12 @@ module accessKeyVault 'br/public:avm/res/key-vault/vault:0.3.5' = {
           secrets: ['get', 'list']
         }
       }
+      {
+        objectId: pdfFunctionApp.outputs.functionAppIdentityPrincipalId
+        permissions: {
+          secrets: ['get', 'list']
+        }
+      }
     ]
     secrets: {
       secureList: [
@@ -119,6 +132,22 @@ module accessKeyVault 'br/public:avm/res/key-vault/vault:0.3.5' = {
         {
           name: connectionStringKey
           value: 'Server=${sqlService.outputs.sqlServerName}${environment().suffixes.sqlServerHostname}; Database=${sqlService.outputs.databaseName}; User=${appUser}; Password=${appUserPassword}'
+        }
+        {
+          name: 'STORAGE-CONNECTION-STRING'
+          value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountRef.name};AccountKey=${storageAccountRef.listKeys().keys[0].value};EndpointSuffix=core.windows.net'
+        }
+        {
+          name: 'INVOICES-CONTAINER'
+          value: 'invoices'
+        }
+        {
+          name: 'INVOICES-JSON-CONTAINER'
+          value: 'invoices-json'
+        }
+        {
+          name: 'PROCESSED-INVOICES-CONTAINER'
+          value: 'processed-invoices'
         }
       ]
     }
@@ -181,6 +210,50 @@ module monitoring 'br/public:avm/ptn/azd/monitoring:0.1.0' = {
     applicationInsightsDashboardName: !empty(applicationInsightsDashboardName) ? applicationInsightsDashboardName : '${abbrs.portalDashboards}${resourceToken}'
     location: location
     tags: tags
+  }
+}
+
+// Create storage account for invoices and processed data
+module storage './app/storage-avm.bicep' = {
+  name: 'storage'
+  scope: rg
+  params: {
+    name: !empty(storageAccountName) ? storageAccountName : '${abbrs.storageStorageAccounts}${resourceToken}'
+    location: location
+    tags: tags
+    containerNames: [
+      'invoices'
+      'invoices-json'
+      'processed-invoices'
+    ]
+  }
+}
+
+// Reference to the storage account for getting connection string
+resource storageAccountRef 'Microsoft.Storage/storageAccounts@2021-04-01' existing = {
+  name: !empty(storageAccountName) ? storageAccountName : '${abbrs.storageStorageAccounts}${resourceToken}'
+  scope: rg
+  dependsOn: [storage]
+}
+
+// Create the PDF extraction function app
+module pdfFunctionApp './app/function-app-avm.bicep' = {
+  name: 'pdf-function-app'
+  scope: rg
+  params: {
+    name: !empty(functionAppName) ? functionAppName : '${abbrs.webSitesFunctions}pdf-${resourceToken}'
+    location: location
+    tags: union(tags, { 'azd-service-name': 'pdf-function' })
+    appServicePlanId: appServicePlan.outputs.resourceId
+    storageConnectionString: '@Microsoft.KeyVault(VaultName=${keyVault.outputs.name};SecretName=STORAGE-CONNECTION-STRING)'
+    appInsightResourceId: monitoring.outputs.applicationInsightsResourceId
+    keyVaultEndpoint: keyVault.outputs.uri
+    functionAppSettings: {
+      STORAGE_CONNECTION_STRING: '@Microsoft.KeyVault(VaultName=${keyVault.outputs.name};SecretName=STORAGE-CONNECTION-STRING)'
+      INVOICES_CONTAINER_NAME: '@Microsoft.KeyVault(VaultName=${keyVault.outputs.name};SecretName=INVOICES-CONTAINER)'
+      INVOICES_JSON_CONTAINER_NAME: '@Microsoft.KeyVault(VaultName=${keyVault.outputs.name};SecretName=INVOICES-JSON-CONTAINER)'
+      PROCESSED_INVOICES_CONTAINER_NAME: '@Microsoft.KeyVault(VaultName=${keyVault.outputs.name};SecretName=PROCESSED-INVOICES-CONTAINER)'
+    }
   }
 }
 
@@ -255,6 +328,14 @@ module web './app/web-appservice-avm.bicep' = {
 
 // Data outputs
 output AZURE_SQL_CONNECTION_STRING_KEY string = connectionStringKey
+
+// Storage outputs
+output AZURE_STORAGE_ACCOUNT_NAME string = storage.outputs.storageAccountName
+output AZURE_STORAGE_CONNECTION_STRING string = 'DefaultEndpointsProtocol=https;AccountName=${storageAccountRef.name};AccountKey=${storageAccountRef.listKeys().keys[0].value};EndpointSuffix=core.windows.net'
+
+// Function app outputs
+output AZURE_FUNCTION_APP_NAME string = pdfFunctionApp.outputs.functionAppName
+output AZURE_FUNCTION_APP_URL string = pdfFunctionApp.outputs.functionAppUrl
 
 // App outputs
 output APPLICATIONINSIGHTS_CONNECTION_STRING string = monitoring.outputs.applicationInsightsConnectionString
