@@ -10,43 +10,50 @@ This project uses environment variables to manage configuration and secrets secu
 - Listed in `.gitignore` to prevent accidental commits
 - Each developer needs their own copy with real values
 
-### `.env.example` (SAFE TO COMMIT)
+### `.env.template` (SAFE TO COMMIT)
 - Template showing required environment variables
-- Contains placeholder/example values only
+- Contains placeholder/example values only  
 - Used for documentation and setup guidance
+
+### `.env.example` (NEVER COMMIT - IGNORED)
+- May contain real values during development
+- Listed in `.gitignore` to prevent accidental commits
+- Each developer creates their own copy from template
 
 ## Setup Instructions
 
 ### For New Developers
-1. Copy `.env.example` to `.env`:
+1. Copy `.env.template` to `.env.example`, then to `.env`:
    ```bash
-   cp .env.example .env
+   cp .env.template .env.example
+   cp .env.template .env
    ```
 
-2. Update `.env` with actual values:
+2. Update `.env.example` with your actual values (this stays local)
+3. Update `.env` with actual values for docker-compose
    - `SQL_SA_PASSWORD`: Set a strong password for SQL Server
    - `AZURE_FORM_RECOGNIZER_ENDPOINT`: Your Azure Document Intelligence endpoint
    - `AZURE_FORM_RECOGNIZER_KEY`: Your Azure Document Intelligence API key
 
 ### For Existing Projects
-If you accidentally committed `.env` files:
+If you accidentally committed `.env` or `.env.example` files with real secrets:
 ```bash
-# Remove from Git tracking (keeps local file)
-git rm --cached .env
+# Remove from Git tracking (keeps local files)
+git rm --cached .env .env.example
 
 # Add to .gitignore if not already there
-echo ".env" >> .gitignore
+echo -e ".env\n.env.example" >> .gitignore
 
 # Commit the changes
 git add .gitignore
-git commit -m "Remove .env from tracking and update .gitignore"
+git commit -m "Remove sensitive env files from tracking and update .gitignore"
 ```
 
 ## Security Checklist
 
-- [ ] `.env` files are in `.gitignore`
-- [ ] No secrets in `.env.example`
-- [ ] Real `.env` file exists locally with proper values
+- [ ] `.env` and `.env.example` files are in `.gitignore`
+- [ ] No secrets in `.env.template`
+- [ ] Real environment files exist locally with proper values
 - [ ] Sensitive values are never hardcoded in source code
 - [ ] Production secrets are managed through secure deployment processes
 
