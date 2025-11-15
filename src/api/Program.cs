@@ -49,6 +49,19 @@ app.UseStaticFiles(new StaticFileOptions
     ServeUnknownFileTypes = true,
 });
 
+// Health check endpoint for container health monitoring
+app.MapGet("/health", async (TodoDb db) =>
+{
+    try
+    {
+        await db.Database.CanConnectAsync();
+        return Results.Ok(new { status = "Healthy", timestamp = DateTime.UtcNow });
+    }
+    catch
+    {
+        return Results.StatusCode(503);
+    }
+});
 
 app.MapGroup("/lists")
     .MapTodoApi()

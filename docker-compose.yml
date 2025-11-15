@@ -1,0 +1,113 @@
+version: '3.8'
+
+services:
+  # SQL Server Express Database
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: todo-sqlserver
+    environment:
+      ACCEPT_EULA: Y
+      SA_PASSWORD: ${SQL_SA_PASSWORD}
+      MSSQL_PID: Express
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+      - ./docker/sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - todo-network
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P ${SQL_SA_PASSWORD} -Q 'SELECT 1' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # Azurite Storage Emulator
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    container_name: todo-azurite
+    command: "azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --location /workspace --debug /workspace/debug.log --loose"
+    ports:
+      - "10000:10000"  # Blob service
+      - "10001:10001"  # Queue service  
+      - "10002:10002"  # Table service
+    volumes:
+      - azurite_data:/workspace
+    networks:
+      - todo-network
+
+  # .NET Web API Backend
+  api:
+    build:
+      context: ./src/api
+      dockerfile: Dockerfile
+    container_name: todo-api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=TodoDb;User Id=sa;Password=${SQL_SA_PASSWORD};TrustServerCertificate=true;
+      - AZURE_SQL_CONNECTION_STRING_KEY=ConnectionStrings__DefaultConnection
+      - AZURE_KEY_VAULT_ENDPOINT=""
+    ports:
+      - "3100:80"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    networks:
+      - todo-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health", "||", "exit", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # React Frontend Web App
+  web:
+    build:
+      context: ./src/web
+      dockerfile: Dockerfile
+    container_name: todo-web
+    environment:
+      - VITE_API_BASE_URL=http://localhost:3100
+      - VITE_APPLICATIONINSIGHTS_CONNECTION_STRING=""
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    networks:
+      - todo-network
+
+  # Python Azure Function
+  function:
+    build:
+      context: ./src/pdf-extract-function
+      dockerfile: Dockerfile
+    container_name: todo-function
+    environment:
+      - AzureWebJobsStorage=DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;
+      - FUNCTIONS_WORKER_RUNTIME=python
+      - INVOICES_CONTAINER_NAME=invoices
+      - INVOICES_JSON_CONTAINER_NAME=results
+      - PROCESSED_INVOICES_CONTAINER_NAME=processed
+      - RESULTS_CONTAINER_NAME=results
+      # Real Form Recognizer values (from .env file)
+      - FORM_RECOGNIZER_ENDPOINT=${FORM_RECOGNIZER_ENDPOINT}
+      - FORM_RECOGNIZER_KEY=${FORM_RECOGNIZER_KEY}
+      - FORM_RECOGNIZER_MODEL_ID=${FORM_RECOGNIZER_MODEL_ID}
+    ports:
+      - "7071:80"
+    depends_on:
+      - azurite
+    networks:
+      - todo-network
+
+networks:
+  todo-network:
+    driver: bridge
+
+volumes:
+  sqlserver_data:
+    driver: local
+  azurite_data:
+    driver: local

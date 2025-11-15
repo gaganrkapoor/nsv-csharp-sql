@@ -1,0 +1,11 @@
+**/.vs/
+**/bin/
+**/obj/
+**/.git/
+**/.gitignore
+**/.dockerignore
+**/Dockerfile*
+**/docker-compose*
+**/README.md
+**/.env
+**/appsettings.Development.json
