@@ -6,6 +6,28 @@ ENV AzureWebJobsScriptRoot=/home/site/wwwroot \
     AzureFunctionsJobHost__Logging__Console__IsEnabled=true \
     FUNCTIONS_WORKER_RUNTIME=python
 
+# Install system dependencies including updated SQLite3 for ChromaDB
+RUN apt-get update && \
+    apt-get install -y \
+    build-essential \
+    curl \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install newer SQLite3 from source (required for ChromaDB)
+RUN curl -O https://www.sqlite.org/2024/sqlite-autoconf-3460000.tar.gz && \
+    tar xzf sqlite-autoconf-3460000.tar.gz && \
+    cd sqlite-autoconf-3460000 && \
+    ./configure --prefix=/usr/local && \
+    make && \
+    make install && \
+    cd .. && \
+    rm -rf sqlite-autoconf-3460000* && \
+    ldconfig
+
+# Update environment to use new SQLite3
+ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+
 # Set working directory
 WORKDIR /home/site/wwwroot
 

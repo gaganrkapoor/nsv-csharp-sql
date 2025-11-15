@@ -37,6 +37,27 @@ services:
     networks:
       - todo-network
 
+  # ChromaDB Vector Database
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: todo-chromadb
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma
+      - ANONYMIZED_TELEMETRY=${CHROMA_SERVER_ANONYMIZED_TELEMETRY:-TRUE}
+    ports:
+      - "8000:8000"
+    volumes:
+      - chromadb_data:/chroma/chroma
+    networks:
+      - todo-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/collections"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
   # .NET Web API Backend
   api:
     build:
@@ -47,7 +68,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=TodoDb;User Id=sa;Password=${SQL_SA_PASSWORD};TrustServerCertificate=true;
       - AZURE_SQL_CONNECTION_STRING_KEY=ConnectionStrings__DefaultConnection
-      - AZURE_KEY_VAULT_ENDPOINT=""
+      - AZURE_KEY_VAULT_ENDPOINT=${AZURE_KEY_VAULT_ENDPOINT}
     ports:
       - "3100:80"
     depends_on:
@@ -70,7 +91,7 @@ services:
     container_name: todo-web
     environment:
       - VITE_API_BASE_URL=http://localhost:3100
-      - VITE_APPLICATIONINSIGHTS_CONNECTION_STRING=""
+      - VITE_APPLICATIONINSIGHTS_CONNECTION_STRING=${VITE_APPLICATIONINSIGHTS_CONNECTION_STRING}
     ports:
       - "3000:80"
     depends_on:
@@ -95,10 +116,19 @@ services:
       - FORM_RECOGNIZER_ENDPOINT=${FORM_RECOGNIZER_ENDPOINT}
       - FORM_RECOGNIZER_KEY=${FORM_RECOGNIZER_KEY}
       - FORM_RECOGNIZER_MODEL_ID=${FORM_RECOGNIZER_MODEL_ID}
+      # Vector Database Configuration
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      # AI/LLM Configuration
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      - AZURE_OPENAI_KEY=${AZURE_OPENAI_KEY}
+      - AZURE_OPENAI_DEPLOYMENT_NAME=${AZURE_OPENAI_DEPLOYMENT_NAME}
     ports:
       - "7071:80"
     depends_on:
       - azurite
+      - chromadb
     networks:
       - todo-network
 
@@ -110,4 +140,6 @@ volumes:
   sqlserver_data:
     driver: local
   azurite_data:
+    driver: local
+  chromadb_data:
     driver: local
