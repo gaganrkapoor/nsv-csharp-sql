@@ -29,8 +29,6 @@ class VectorService:
         self.chroma_host = os.getenv('CHROMA_HOST', 'localhost')
         self.chroma_port = int(os.getenv('CHROMA_PORT', '8000'))
         self.openai_api_key = os.getenv('OPENAI_API_KEY')
-        self.azure_openai_endpoint = os.getenv('AZURE_OPENAI_ENDPOINT')
-        self.azure_openai_key = os.getenv('AZURE_OPENAI_KEY')
         
         # Initialize ChromaDB client
         try:
@@ -272,8 +270,9 @@ class VectorService:
             if not self.openai_client:
                 return None
                 
+            embedding_model = os.getenv('EMBEDDING_MODEL', 'text-embedding-ada-002')
             response = self.openai_client.embeddings.create(
-                model="text-embedding-ada-002",
+                model=embedding_model,
                 input=text
             )
             return response.data[0].embedding

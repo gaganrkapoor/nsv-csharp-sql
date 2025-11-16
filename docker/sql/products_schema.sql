@@ -1,22 +1,5 @@
--- Initialize Todo Database
-USE master;
-GO
-
--- Create TodoDb database if it doesn't exist
-IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'TodoDb')
-BEGIN
-    CREATE DATABASE TodoDb;
-END
-GO
-
-USE TodoDb;
-GO
-
--- Create application user for Entity Framework
--- Note: In containerized environment, we'll use SA account for simplicity
--- In production, you should create a dedicated application user
-
--- === Product Matching Schema ===
+-- SQL Schema for Product Matching Database
+-- This creates tables for products, categories, and matching/training data
 
 -- Categories table for product classification
 CREATE TABLE Categories (
@@ -118,7 +101,3 @@ INSERT INTO ProductDescriptions (ProductId, AlternativeDescription, DescriptionT
     (4, 'SS bolts M10x50', 'invoice', 'Katoomba'),
     (4, 'stainless hex bolt 10mm', 'invoice', 'Bunnings'),
     (5, 'heavy duty hinge 100', 'invoice', 'Katoomba');
-
--- Verify database creation
-SELECT 'TodoDb database created successfully with product matching schema' AS Status;
-GO

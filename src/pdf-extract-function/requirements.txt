@@ -16,6 +16,10 @@ openai>=1.3.0
 langchain>=0.1.0
 langchain-openai>=0.1.0
 langchain-community>=0.1.0
+langchain-text-splitters>=0.1.0
+
+# SQL Server connectivity
+pyodbc>=4.0.39
 
 # Data processing dependencies
 numpy
